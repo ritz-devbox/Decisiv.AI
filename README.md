@@ -1,0 +1,29 @@
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+</div>
+
+# Strategic Resolution Hub
+
+This repository contains everything you need to run the app locally.
+
+## Demo / Live App
+
+If you want to share a demo, add your public URL here.
+
+`Demo link: <add-your-public-demo-url>`
+
+## Run Locally
+
+**Prerequisites:** Node.js
+
+
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
+
+## Security Notes
+
+- Do not commit API keys or secrets.
+- Only share links that you intentionally made public.

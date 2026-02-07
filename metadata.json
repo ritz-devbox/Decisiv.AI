@@ -1,0 +1,9 @@
+{
+  "name": "Decisiv.AI | Strategic Resolution Hub",
+  "description": "A high-precision utility designed to evaluate complex trade-offs and provide definitive, data-driven decisions with confidence scores and risk assessments.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera",
+    "microphone"
+  ]
+}
