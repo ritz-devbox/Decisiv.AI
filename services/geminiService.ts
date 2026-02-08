@@ -37,16 +37,23 @@ export const getDecision = async (input: DecisionInput, settings: EngineSettings
     
   const parts: any[] = [{ text: prompt }];
   if (input.image) {
-    parts.push({ inlineData: { mimeType: "image/jpeg", data: input.image.split(',')[1] } });
+    const mimeType = input.image.split(';')[0].split(':')[1] || "image/jpeg";
+    const base64Data = input.image.split(',')[1];
+    parts.push({ 
+      inlineData: { 
+        mimeType: mimeType, 
+        data: base64Data 
+      } 
+    });
   }
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview', 
+  const modelParams = {
     contents: { parts },
     config: {
       systemInstruction,
       responseMimeType: "application/json",
       tools: input.useSearch ? [{ googleSearch: {} }] : undefined,
+      thinkingConfig: { thinkingBudget: 16384 },
       responseSchema: {
         type: Type.OBJECT,
         properties: {
@@ -143,12 +150,27 @@ export const getDecision = async (input: DecisionInput, settings: EngineSettings
         required: ["decision", "simpleDecision", "confidenceScore", "urgencyLevel", "thinkingLevel", "reasons", "criticalRisk", "simpleCriticalRisk", "riskElaboration", "simpleRiskElaboration", "failureChain", "marketSentiment", "vectors", "executionPlan"]
       }
     }
-  });
+  };
+
+  let response;
+  try {
+    // Attempt Primary Pro Model
+    response = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview', 
+      ...modelParams
+    });
+  } catch (err: any) {
+    // Automatic Fallback on Quota or Pro failure
+    console.warn("Primary Pro model restricted. Falling back to Flash kernel.");
+    response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      ...modelParams
+    });
+  }
 
   const rawText = response.text || "{}";
   let res: any = JSON.parse(rawText);
   
-  // Staggered secondary analysis to reduce token bottleneck
   try {
     await delay(300);
     res.warGame = await runWarGame(res.decision, input.context, isLaymanMode).catch(() => null);
@@ -182,11 +204,12 @@ export const getDecision = async (input: DecisionInput, settings: EngineSettings
 export const runWarGame = async (decision: string, context: string, isLayman: boolean = false): Promise<WarGameResult> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const prompt = `PERFORM ADVERSARIAL WAR-GAME SIMULATION. DECISION: "${decision}". CONTEXT: "${context}".`;
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
+  
+  const modelParams = {
     contents: prompt,
     config: {
       responseMimeType: "application/json",
+      thinkingConfig: { thinkingBudget: 8192 },
       responseSchema: {
         type: Type.OBJECT,
         properties: {
@@ -214,18 +237,26 @@ export const runWarGame = async (decision: string, context: string, isLayman: bo
         required: ["paths", "recommendedPathId", "comparativeAnalysis", "simpleComparison"]
       }
     }
-  });
+  };
+
+  let response;
+  try {
+    response = await ai.models.generateContent({ model: 'gemini-3-pro-preview', ...modelParams });
+  } catch (e) {
+    response = await ai.models.generateContent({ model: 'gemini-3-flash-preview', ...modelParams });
+  }
   return JSON.parse(response.text || "{}");
 };
 
 export const runCollaborativeAudit = async (decision: string, context: string, isLayman: boolean = false): Promise<CollaborativeAudit> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const prompt = `MULTI-AGENT LOGIC AUDIT. DECISION: "${decision}". AUDIT FOR BIAS, FRAGILITY, AND LONG-TERM SUSTAINABILITY.`;
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
+  
+  const modelParams = {
     contents: prompt,
     config: {
       responseMimeType: "application/json",
+      thinkingConfig: { thinkingBudget: 4096 },
       responseSchema: {
         type: Type.OBJECT,
         properties: {
@@ -249,7 +280,14 @@ export const runCollaborativeAudit = async (decision: string, context: string, i
         required: ["nodes", "consensusScore", "terminalSummary", "simpleSummary"]
       }
     }
-  });
+  };
+
+  let response;
+  try {
+    response = await ai.models.generateContent({ model: 'gemini-3-pro-preview', ...modelParams });
+  } catch (e) {
+    response = await ai.models.generateContent({ model: 'gemini-3-flash-preview', ...modelParams });
+  }
   return JSON.parse(response.text || "{}");
 };
 
@@ -309,7 +347,7 @@ export const transmitProtocol = async (brief: any): Promise<string> => {
 export const generateScenario = async (title: string, domain: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
+    model: 'gemini-3-flash-preview',
     contents: `Write a high-stakes professional scenario description for a dilemma titled "${title}" in the domain of "${domain}". Focus on complexity and hidden risks.`,
   });
   return response.text || "";

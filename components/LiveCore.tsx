@@ -67,37 +67,6 @@ const LiveCore: React.FC<LiveCoreProps> = ({ isLaymanMode, activeProtocol, force
             />
          </div>
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-12">
-         {[
-           { 
-             title: 'Vision-Sensing', 
-             desc: 'Hold physical documents or complex diagrams to the camera for real-time OCR and logical ingestion.', 
-             icon: ShieldAlert,
-             active: true
-           },
-           { 
-             title: 'Voice-Sensing', 
-             desc: 'Proprietary native audio processing for ultra-low latency logical interrogation.', 
-             icon: Activity,
-             active: true
-           },
-           { 
-             title: 'Contextual Grounding', 
-             desc: 'Every word spoken is cross-referenced with real-time global news indices.', 
-             icon: Globe,
-             active: true
-           }
-         ].map(feature => (
-           <div key={feature.title} className="glass rounded-[40px] p-10 border border-white/5 space-y-6 hover:border-blue-500/20 transition-all">
-              <div className="p-4 bg-white/5 rounded-2xl border border-white/5 inline-block">
-                 <feature.icon className="w-6 h-6 text-slate-500" />
-              </div>
-              <h4 className="text-xl font-black text-white uppercase tracking-tight">{feature.title}</h4>
-              <p className="text-sm text-slate-500 leading-relaxed italic font-medium">"{feature.desc}"</p>
-           </div>
-         ))}
-      </div>
     </div>
   );
 };

@@ -12,17 +12,18 @@ import DecisionForm from './components/DecisionForm';
 import DecisionDisplay from './components/DecisionDisplay';
 import HistoryHub from './components/HistoryHub';
 import LiveCore from './components/LiveCore';
-import SampleSelector from './components/SampleSelector';
+import SampleSelector, { SAMPLES } from './components/SampleSelector';
 import { getDecision } from './services/geminiService';
-import { ShieldCheck, Sparkles, Brain, Cpu, Zap, LayoutGrid, Clock, Radio, MonitorDot, AlertTriangle, RefreshCw, Activity } from 'lucide-react';
+import { ShieldCheck, Sparkles, Brain, Cpu, Zap, LayoutGrid, Clock, Radio, AlertTriangle, RefreshCw, Activity, Key, ChevronRight, ExternalLink } from 'lucide-react';
 
 const App: React.FC = () => {
+  const [isAuthorized, setIsAuthorized] = useState(false);
   const [view, setView] = useState<AppView>('HUB');
   const [engineState, setEngineState] = useState<EngineState>(EngineState.IDLE);
   const [isLaymanMode, setIsLaymanMode] = useState(false);
   const [progress, setProgress] = useState(0);
   const [thinkingLog, setThinkingLog] = useState('INITIALIZING_CORE');
-  const [errorType, setErrorType] = useState<'GENERIC' | 'QUOTA'>('GENERIC');
+  const [errorType, setErrorType] = useState<'GENERIC' | 'QUOTA' | 'AUTH'>('GENERIC');
   
   const [formData, setFormData] = useState<DecisionInput>({
     title: '',
@@ -39,7 +40,6 @@ const App: React.FC = () => {
   const [forceQuery, setForceQuery] = useState<{ text: string; timestamp: number } | null>(null);
 
   const progressIntervalRef = useRef<number | null>(null);
-  const sessionId = useMemo(() => `SID-${Math.random().toString(36).slice(2, 8).toUpperCase()}`, []);
 
   const settings: EngineSettings = {
     voiceName: 'Zephyr',
@@ -47,12 +47,31 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    const checkAuth = async () => {
+      if (window.aistudio) {
+        const hasKey = await window.aistudio.hasSelectedApiKey();
+        if (hasKey) setIsAuthorized(true);
+      } else {
+        setIsAuthorized(true);
+      }
+    };
+    checkAuth();
+    
     const saved = localStorage.getItem('decisiv_history');
     if (saved) setHistory(JSON.parse(saved));
+    
     return () => {
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
     };
   }, []);
+
+  const handleInitializeCore = async () => {
+    if (window.aistudio) {
+      await window.aistudio.openSelectKey();
+    }
+    // Proceed immediately to the app to prevent recording delays
+    setIsAuthorized(true);
+  };
 
   const handleSubmit = async (input: DecisionInput) => {
     if (engineState === EngineState.LOADING) return;
@@ -78,10 +97,8 @@ const App: React.FC = () => {
       setProgress(prev => {
         if (prev >= 100) return 100;
         if (prev >= 98) return 98;
-        
         const inc = Math.random() * 2.2; 
         const next = Math.min(98, prev + inc);
-        
         const currentLogTarget = (logIdx + 1) * (100 / logs.length);
         if (next > currentLogTarget) {
             logIdx = Math.min(logIdx + 1, logs.length - 1);
@@ -115,9 +132,15 @@ const App: React.FC = () => {
         clearInterval(progressIntervalRef.current);
         progressIntervalRef.current = null;
       }
-      console.error("Resolution Error:", error);
       const errStr = JSON.stringify(error).toLowerCase();
-      setErrorType(errStr.includes('quota') || errStr.includes('429') ? 'QUOTA' : 'GENERIC');
+      if (errStr.includes('quota') || errStr.includes('429')) {
+        setErrorType('QUOTA');
+      } else if (errStr.includes('key') || errStr.includes('auth') || errStr.includes('unauthorized')) {
+        setErrorType('AUTH');
+        setIsAuthorized(false);
+      } else {
+        setErrorType('GENERIC');
+      }
       setEngineState(EngineState.ERROR);
     }
   };
@@ -129,6 +152,58 @@ const App: React.FC = () => {
     setView('HUB');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen bg-[#020617] text-white flex flex-col items-center justify-center p-10 relative overflow-hidden">
+        <div className="absolute inset-0 z-0">
+          <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-600/20 blur-[150px] animate-pulse" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-emerald-600/10 blur-[150px] animate-pulse" style={{ animationDelay: '2s' }} />
+        </div>
+        
+        <div className="relative z-10 w-full max-w-2xl text-center space-y-16 animate-in fade-in zoom-in-95 duration-1000">
+           <div className="flex flex-col items-center gap-10">
+              <div className="w-32 h-32 bg-blue-600 rounded-[40px] flex items-center justify-center shadow-[0_0_80px_rgba(59,130,246,0.5)]">
+                 <ShieldCheck className="w-16 h-16 text-white" />
+              </div>
+              <div className="space-y-4">
+                <h1 className="text-6xl font-black uppercase tracking-tighter">Decisiv.<span className="text-blue-500">AI</span></h1>
+                <p className="text-slate-500 font-bold uppercase tracking-[0.5em] text-sm">Strategic Resolution Engine v3.2</p>
+              </div>
+           </div>
+
+           <div className="glass-dark border border-white/10 rounded-[48px] p-12 space-y-10 shadow-2xl backdrop-blur-3xl">
+              <div className="space-y-6">
+                <h2 className="text-2xl font-black uppercase tracking-tight">System Initialization</h2>
+                <p className="text-slate-400 text-lg font-medium italic leading-relaxed">
+                  Authorize the reasoning core to begin. Note: Video Teasers and high-spectral modules require a paid project key.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-6">
+                <button 
+                  onClick={handleInitializeCore}
+                  className="group relative w-full py-10 rounded-[32px] bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-[0.5em] text-sm transition-premium flex items-center justify-center gap-4 shadow-[0_20px_60px_rgba(59,130,246,0.4)] active:scale-95 border border-white/10"
+                >
+                  Initialize Strategic Core
+                  <ChevronRight className="w-6 h-6 group-hover:translate-x-2 transition-transform" />
+                </button>
+                
+                <a 
+                  href="https://ai.google.dev/gemini-api/docs/billing" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-3 text-slate-500 hover:text-white transition-colors text-[10px] font-black uppercase tracking-widest"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  API Billing Documentation
+                </a>
+              </div>
+           </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#020617] text-slate-200 font-sans selection:bg-blue-500/30 overflow-x-hidden print:overflow-visible print:bg-white">
@@ -168,11 +243,6 @@ const App: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-4 border-l border-white/10 pl-8 pr-4">
-            <div className="hidden xl:flex items-center gap-3 px-5 py-2.5 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 group">
-              <Activity className="w-4 h-4 text-emerald-500 group-hover:animate-pulse" />
-              <span className="text-[9px] font-mono font-bold text-emerald-400 uppercase tracking-widest">Neural Link Active</span>
-            </div>
-
             <button 
               onClick={() => setIsLaymanMode(!isLaymanMode)}
               className={`flex items-center gap-3 px-8 py-3.5 rounded-[32px] border text-[11px] font-black uppercase tracking-widest transition-premium shadow-xl ${
@@ -192,27 +262,39 @@ const App: React.FC = () => {
         {view === 'HUB' && (
           <div className="space-y-40 animate-in fade-in duration-1000 print:space-y-10 print:animate-none">
             {engineState === EngineState.ERROR && (
-              <div className="max-w-4xl mx-auto p-12 glass border border-red-500/30 bg-red-950/20 rounded-[64px] shadow-2xl flex flex-col items-center text-center gap-10 animate-in slide-in-from-top-12 no-print">
-                <div className="w-24 h-24 bg-red-600/20 rounded-[32px] flex items-center justify-center border border-red-500/40">
+              <div className="max-w-4xl mx-auto p-12 glass border border-red-500/30 bg-red-950/20 rounded-[64px] shadow-2xl flex flex-col items-center text-center gap-10 animate-in slide-in-from-top-12 no-print relative overflow-hidden">
+                <div className="absolute inset-0 bg-red-600/5 animate-pulse pointer-events-none" />
+                <div className="w-24 h-24 bg-red-600/20 rounded-[32px] flex items-center justify-center border border-red-500/40 relative z-10">
                   <AlertTriangle className="w-12 h-12 text-red-500" />
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-4 relative z-10">
                   <h3 className="text-4xl font-black text-white uppercase tracking-tighter">
-                    {errorType === 'QUOTA' ? 'Neural Limit Reached' : 'Logic Core Fault'}
+                    {errorType === 'QUOTA' ? 'Neural Limit Reached' : errorType === 'AUTH' ? 'Authorization Error' : 'Logic Core Fault'}
                   </h3>
                   <p className="text-slate-400 font-medium italic max-w-lg leading-relaxed">
                     {errorType === 'QUOTA' 
-                      ? "The AI provider's quota for your current project is exhausted. This usually resets after 60 seconds." 
-                      : "The Strategic Resolution Engine encountered an unexpected disruption."}
+                      ? "The AI provider's quota is exhausted. This usually resets within 60 seconds." 
+                      : errorType === 'AUTH'
+                      ? "The secure connection to the reasoning core failed. Your key may be invalid or restricted."
+                      : "The Strategic Resolution Engine encountered an unexpected disruption during synthesis."}
                   </p>
                 </div>
-                <button 
-                  onClick={() => handleSubmit(formData)}
-                  className="px-12 py-5 bg-red-600 rounded-[32px] border border-red-400 text-white font-black uppercase tracking-[0.3em] text-[12px] flex items-center gap-4 transition-premium hover:scale-105 active:scale-95 shadow-[0_20px_40px_rgba(220,38,38,0.3)]"
-                >
-                  <RefreshCw className="w-5 h-5" />
-                  Retry Strategic Synthesis
-                </button>
+                <div className="flex flex-col sm:flex-row gap-6 relative z-10 w-full justify-center">
+                  <button 
+                    onClick={() => handleSubmit(formData)}
+                    className="px-12 py-5 bg-red-600 rounded-[32px] border border-red-400 text-white font-black uppercase tracking-[0.3em] text-[12px] flex items-center justify-center gap-4 transition-premium hover:scale-105 active:scale-95 shadow-[0_20px_40px_rgba(220,38,38,0.3)]"
+                  >
+                    <RefreshCw className="w-5 h-5" />
+                    Retry Protocol
+                  </button>
+                  <button 
+                    onClick={() => setIsAuthorized(false)}
+                    className="px-12 py-5 bg-slate-900 rounded-[32px] border border-white/10 text-slate-400 font-black uppercase tracking-[0.3em] text-[12px] flex items-center justify-center gap-4 transition-premium hover:scale-105 active:scale-95 hover:text-white"
+                  >
+                    <Key className="w-5 h-5" />
+                    Reset Key Authorization
+                  </button>
+                </div>
               </div>
             )}
 

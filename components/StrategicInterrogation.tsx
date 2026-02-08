@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { DecisionResponse, ChatMessage } from '../types';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
-import { Zap, Mic, MicOff, Video, VideoOff, Volume2, Scan, Loader2, User, Bot, ShieldQuestion, FileSearch, ShieldCheck, Activity } from 'lucide-react';
+import { Zap, Mic, MicOff, Video, VideoOff, Volume2, Scan, Loader2, User, Bot, ShieldQuestion, FileSearch, ShieldCheck, Activity, AlertCircle } from 'lucide-react';
 import { decode, encode, decodeAudioData, createPcmBlob } from '../services/geminiService';
 
 interface StrategicInterrogationProps {
@@ -16,6 +16,7 @@ interface StrategicInterrogationProps {
 const StrategicInterrogation: React.FC<StrategicInterrogationProps> = ({ decision, context, forceQuery, onQueryConsumed, laymanMode }) => {
   const [isLive, setIsLive] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isMicActive, setIsMicActive] = useState(false);
   const [isVideoActive, setIsVideoActive] = useState(false);
@@ -48,11 +49,11 @@ const StrategicInterrogation: React.FC<StrategicInterrogationProps> = ({ decisio
   const startLiveSession = async (initialQuery?: string) => {
     if (isLive || isConnecting) return;
     setIsConnecting(true);
+    setConnectionError(null);
     
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
-      // Explicitly initialize AudioContexts on user gesture
       inputAudioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       outputAudioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       
@@ -107,7 +108,6 @@ const StrategicInterrogation: React.FC<StrategicInterrogationProps> = ({ decisio
             source.connect(processor);
             processor.connect(inputAudioCtxRef.current!.destination);
             
-            // Frame streaming for visual interrogation
             const interval = setInterval(async () => {
               if (!isVideoActive) return;
               const data = await captureFrame(0.4);
@@ -138,7 +138,7 @@ const StrategicInterrogation: React.FC<StrategicInterrogationProps> = ({ decisio
 
             if (msg.serverContent?.interrupted) {
               for (const source of sourcesRef.current) {
-                source.stop();
+                try { source.stop(); } catch(e) {}
               }
               sourcesRef.current.clear();
               nextStartTimeRef.current = 0;
@@ -153,9 +153,14 @@ const StrategicInterrogation: React.FC<StrategicInterrogationProps> = ({ decisio
               setTranscription('');
             }
           },
-          onclose: () => stopLiveSession(),
+          onclose: () => {
+            console.debug("Live session closed.");
+            stopLiveSession();
+          },
           onerror: (e) => {
             console.error("Live session error:", e);
+            const errStr = JSON.stringify(e).toLowerCase();
+            setConnectionError(errStr.includes("quota") ? "Project Quota Exhausted" : "Neural Link Interrupted");
             stopLiveSession();
           }
         },
@@ -168,6 +173,7 @@ const StrategicInterrogation: React.FC<StrategicInterrogationProps> = ({ decisio
       sessionRef.current = sessionPromise;
     } catch (e) { 
       console.error("Could not start live session:", e); 
+      setConnectionError("Failed to initiate Live Link");
       stopLiveSession();
     }
   };
@@ -185,7 +191,9 @@ const StrategicInterrogation: React.FC<StrategicInterrogationProps> = ({ decisio
     setIsMicActive(false); 
     setVolumeLevel(0);
     if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-    if (sessionRef.current) sessionRef.current.then((s: any) => s.close());
+    if (sessionRef.current) sessionRef.current.then((s: any) => {
+      try { s.close(); } catch(e) {}
+    });
     if ((window as any)._videoInterval) clearInterval((window as any)._videoInterval);
     if (inputAudioCtxRef.current) inputAudioCtxRef.current.close();
     if (outputAudioCtxRef.current) outputAudioCtxRef.current.close();
@@ -226,21 +234,21 @@ const StrategicInterrogation: React.FC<StrategicInterrogationProps> = ({ decisio
 
   return (
     <div className="glass rounded-[48px] border border-white/10 overflow-hidden flex flex-col h-[850px] mt-12 animate-in fade-in slide-in-from-bottom-6 duration-1000 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.8)] relative">
-      <div className={`absolute top-0 left-0 w-full h-1.5 z-50 transition-all duration-1000 ${isLive ? 'bg-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.8)]' : 'bg-blue-600/40'}`} />
+      <div className={`absolute top-0 left-0 w-full h-1.5 z-50 transition-all duration-1000 ${isLive ? 'bg-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.8)]' : connectionError ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.8)]' : 'bg-blue-600/40'}`} />
       
       <div className="p-8 bg-slate-950/40 border-b border-white/5 flex items-center justify-between z-10">
         <div className="flex items-center gap-5">
-          <div className={`p-3 rounded-2xl border transition-all duration-500 ${isLive ? 'bg-emerald-500/20 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'bg-slate-900 border-white/10'}`}>
-            <Zap className={`w-5 h-5 ${isLive ? 'text-emerald-400' : 'text-slate-600'}`} />
+          <div className={`p-3 rounded-2xl border transition-all duration-500 ${isLive ? 'bg-emerald-500/20 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]' : connectionError ? 'bg-red-500/20 border-red-500/40' : 'bg-slate-900 border-white/10'}`}>
+            {connectionError ? <AlertCircle className="w-5 h-5 text-red-500" /> : <Zap className={`w-5 h-5 ${isLive ? 'text-emerald-400' : 'text-slate-600'}`} />}
           </div>
           <div>
             <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-white">
-              {isLive ? 'Live Interface Sync' : 'Interrogation Console'}
+              {isLive ? 'Live Interface Sync' : connectionError ? 'Connection Fault' : 'Interrogation Console'}
             </h3>
             <div className="flex items-center gap-3 mt-1">
-               <div className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-700'}`} />
-               <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">
-                {laymanMode ? 'Simple Mode Active // Analogies Engaged' : 'Neural Core Active // Recursive Sync'}
+               <div className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-emerald-500 animate-pulse' : connectionError ? 'bg-red-500' : 'bg-slate-700'}`} />
+               <p className={`text-[8px] font-bold uppercase tracking-widest ${connectionError ? 'text-red-400' : 'text-slate-500'}`}>
+                {connectionError ? connectionError : laymanMode ? 'Simple Mode Active // Analogies Engaged' : 'Neural Core Active // Recursive Sync'}
               </p>
             </div>
           </div>
@@ -259,7 +267,7 @@ const StrategicInterrogation: React.FC<StrategicInterrogationProps> = ({ decisio
             className={`px-6 py-3 rounded-2xl border font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-3 ${isLive ? 'bg-red-600 border-red-400 text-white shadow-lg' : 'bg-emerald-600/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-600 hover:text-white'}`}
           >
             {isConnecting ? <Loader2 className="w-4 h-4 animate-spin" /> : isLive ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-            {isConnecting ? 'Connecting' : isLive ? 'Disconnect' : 'Connect'}
+            {isConnecting ? 'Connecting' : isLive ? 'Disconnect' : 'Connect Link'}
           </button>
         </div>
       </div>
@@ -304,8 +312,10 @@ const StrategicInterrogation: React.FC<StrategicInterrogationProps> = ({ decisio
         <div className="flex-1 overflow-y-auto p-12 space-y-12 no-scrollbar relative">
           {messages.length === 0 && !isLive && (
             <div className="h-full flex flex-col items-center justify-center text-center space-y-10 opacity-30">
-              <ShieldQuestion className="w-16 h-16 text-slate-700" />
-              <p className="text-[11px] text-slate-700 font-black uppercase tracking-[0.5em] max-w-sm">Use Live Link to Stress-Test the Logic Core.</p>
+              {connectionError ? <AlertCircle className="w-16 h-16 text-red-500" /> : <ShieldQuestion className="w-16 h-16 text-slate-700" />}
+              <p className={`text-[11px] font-black uppercase tracking-[0.5em] max-w-sm ${connectionError ? 'text-red-500' : 'text-slate-700'}`}>
+                {connectionError ? 'The neural channel was severed. Please attempt reconnection.' : 'Use Live Link to Stress-Test the Logic Core.'}
+              </p>
             </div>
           )}
           

@@ -1,5 +1,5 @@
 
-import React, { useRef, useState, useMemo, ReactElement } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import { DecisionInput, DecisionDomain } from '../types';
 import { 
   SendHorizontal, 
@@ -12,17 +12,19 @@ import {
   Home, 
   LineChart, 
   Target, 
-  AlertCircle, 
-  ScanSearch, 
   Info, 
   Wand2, 
   Cpu, 
   Stethoscope,
   Settings as GearIcon,
   XCircle,
-  FileText,
   Zap,
-  RotateCcw
+  RotateCcw,
+  Sparkles,
+  Image as ImageIcon,
+  FileText,
+  X,
+  CheckCircle2
 } from 'lucide-react';
 import { generateScenario } from '../services/geminiService';
 
@@ -78,10 +80,12 @@ const DecisionForm: React.FC<DecisionFormProps> = ({ onSubmit, initialData, onCh
   const [isGeneratingContext, setIsGeneratingContext] = useState(false);
   const [showValidationErrors, setShowValidationErrors] = useState(false);
 
+  const isPdf = initialData.image?.startsWith('data:application/pdf');
+
   const errors = useMemo(() => {
     const list: string[] = [];
-    if (!initialData.title.trim()) list.push("PROTOCOL_IDENTITY_REQUIRED");
-    if (!initialData.context.trim()) list.push("SCENARIO_BUFFER_EMPTY");
+    if (!initialData.title.trim()) list.push("TITLE_REQUIRED");
+    if (!initialData.context.trim()) list.push("CONTEXT_MISSING");
     return list;
   }, [initialData.title, initialData.context]);
 
@@ -105,7 +109,8 @@ const DecisionForm: React.FC<DecisionFormProps> = ({ onSubmit, initialData, onCh
       constraints: '',
       risks: '',
       domain: 'Business',
-      useSearch: false
+      useSearch: false,
+      image: undefined
     });
   };
 
@@ -120,6 +125,21 @@ const DecisionForm: React.FC<DecisionFormProps> = ({ onSubmit, initialData, onCh
     } finally {
       setIsGeneratingContext(false);
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        onChange({ ...initialData, image: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    onChange({ ...initialData, image: undefined });
   };
 
   const domains: { value: DecisionDomain; icon: React.ReactNode }[] = useMemo(() => [
@@ -290,6 +310,53 @@ const DecisionForm: React.FC<DecisionFormProps> = ({ onSubmit, initialData, onCh
                              <div className="w-16 h-8 bg-slate-900 rounded-full border border-white/10 transition-premium peer-checked:bg-blue-600 peer-checked:border-blue-400 after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:rounded-full after:h-[22px] after:w-[22px] after:transition-all peer-checked:after:translate-x-8" />
                           </label>
                        </div>
+
+                       <div className="pt-8 border-t border-white/5 space-y-8">
+                          <div className="flex items-center justify-between group relative">
+                             <LogicTooltip 
+                               title="Multi-Modal Ingest"
+                               purpose="Analyzes schematics, PDF clinical reports, blueprints, or medical data to ingest technical priors."
+                               impact="Adds a dimension of physical-world verification and document audit to strategic reasoning."
+                               align="right"
+                             />
+                             <div className="flex items-center gap-5">
+                                <div className="relative">
+                                   <ImageIcon className={`w-8 h-8 transition-premium ${initialData.image && !isPdf ? 'text-blue-400 drop-shadow-[0_0_12px_rgba(59,130,246,0.6)]' : 'text-slate-800'}`} />
+                                   <FileText className={`w-4 h-4 absolute -bottom-1 -right-1 transition-premium ${isPdf ? 'text-blue-400' : 'text-slate-900'}`} />
+                                </div>
+                                <span className={`text-[12px] font-black uppercase tracking-[0.6em] ${initialData.image ? 'text-white' : 'text-slate-700'}`}>Prior Asset</span>
+                             </div>
+                             <button 
+                               type="button"
+                               onClick={() => fileInputRef.current?.click()}
+                               className={`p-3 rounded-xl border transition-premium ${initialData.image ? 'bg-blue-600/20 border-blue-400 text-blue-400' : 'bg-slate-900 border-white/10 text-slate-500 hover:text-white hover:border-blue-500'}`}
+                             >
+                                <Upload className="w-5 h-5" />
+                             </button>
+                             <input ref={fileInputRef} type="file" accept="image/*,application/pdf" onChange={handleFileChange} className="hidden" />
+                          </div>
+
+                          {initialData.image && (
+                            <div className="relative aspect-video rounded-3xl overflow-hidden border border-white/10 shadow-2xl animate-in zoom-in-95 group/preview bg-black/40">
+                               {isPdf ? (
+                                 <div className="w-full h-full flex flex-col items-center justify-center gap-4 text-blue-400/60 p-10">
+                                    <FileText className="w-16 h-16" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Document Captured</span>
+                                 </div>
+                               ) : (
+                                 <img src={initialData.image} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" alt="Asset Preview" />
+                               )}
+                               <div className="absolute inset-0 bg-blue-500/10 pointer-events-none" />
+                               <button 
+                                 type="button"
+                                 onClick={removeImage}
+                                 className="absolute top-4 right-4 p-2 bg-black/60 backdrop-blur-md rounded-lg text-white hover:bg-red-600 transition-colors z-20"
+                               >
+                                 <X className="w-4 h-4" />
+                               </button>
+                            </div>
+                          )}
+                       </div>
                     </div>
                     
                     <div className="space-y-8">
@@ -297,8 +364,12 @@ const DecisionForm: React.FC<DecisionFormProps> = ({ onSubmit, initialData, onCh
                        <div className="p-10 bg-black/50 border border-white/10 rounded-[40px] space-y-6 shadow-[inset_0_10px_30px_rgba(0,0,0,0.5)]">
                           <div className="flex items-center justify-between">
                              <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Buffer Health</span>
-                             <span className={`text-[11px] font-mono font-bold uppercase tracking-widest ${errors.length === 0 ? 'text-emerald-500' : 'text-amber-600'}`}>
-                               {errors.length === 0 ? 'Optimal' : 'Insufficient'}
+                             <span className={`text-[11px] font-mono font-bold uppercase tracking-widest transition-colors duration-500 flex items-center gap-2 ${errors.length === 0 ? 'text-emerald-500' : 'text-amber-500'}`}>
+                               {errors.length === 0 ? (
+                                 <><CheckCircle2 className="w-3.5 h-3.5" /> Ready</>
+                               ) : (
+                                 errors[0].replace('_', ' ')
+                               )}
                              </span>
                           </div>
                           <div className="flex items-center justify-between">
@@ -317,79 +388,15 @@ const DecisionForm: React.FC<DecisionFormProps> = ({ onSubmit, initialData, onCh
                       disabled={isProcessing}
                       className="relative w-full py-12 rounded-[48px] font-black text-[16px] uppercase tracking-[1em] transition-premium shadow-2xl active:scale-[0.96] disabled:opacity-5 overflow-hidden flex items-center justify-center gap-6 bg-[#0a1128] border border-blue-500/50 text-white hover:border-blue-400 hover:shadow-[0_0_60px_rgba(59,130,246,0.5)]"
                     >
-                        <div className="absolute inset-0 bg-gradient-to-br from-blue-600/40 via-transparent to-emerald-500/40 opacity-70 pointer-events-none" />
-                        <div className="absolute inset-0 translate-x-[-100%] group-hover/btn:translate-x-[100%] bg-gradient-to-r from-transparent via-white/10 to-transparent transition-all duration-1000 ease-in-out pointer-events-none" />
-                        
-                        {isProcessing ? (
-                          <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
-                        ) : (
-                          <Zap className={`w-6 h-6 transition-premium ${isValid ? 'text-blue-400 scale-125 drop-shadow-[0_0_12px_rgba(59,130,246,0.8)]' : 'text-slate-800'}`} />
-                        )}
-                        <span className={`relative z-10 pl-6 ${!isValid && 'text-slate-700'}`}>{isProcessing ? 'Synthesizing' : 'Resolve'}</span>
+                        <div className="absolute inset-0 bg-gradient-to-br from-blue-600/40 via-transparent to-emerald-500/20 opacity-0 group-hover/btn:opacity-100 transition-opacity" />
+                        <span className="relative z-10 flex items-center gap-6">
+                           Resolve Protocol
+                           <SendHorizontal className={`w-6 h-6 transition-transform duration-500 ${isValid ? 'group-hover/btn:translate-x-2' : ''}`} />
+                        </span>
                     </button>
                  </div>
               </div>
            </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 px-4 relative z-10">
-           {[
-             { id: 'constraints', icon: Target, label: 'Constraints', placeholder: 'BUDGET, TIME, OR ETHICAL LIMITS...', color: 'blue' },
-             { id: 'risks', icon: AlertCircle, label: 'Volatility', placeholder: 'KNOWN RISKS OR COMPETITIVE THREATS...', color: 'red' },
-             { id: 'image', icon: Upload, label: 'Visual Ingest', type: 'asset' }
-           ].map((field, idx) => {
-             if (field.type === 'asset') {
-               return (
-                <div 
-                  key={idx}
-                  className="glass rounded-[56px] p-12 border border-white/10 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500/40 transition-premium group min-h-[260px] shadow-2xl hover:shadow-[0_40px_80px_rgba(0,0,0,0.4)]" 
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {!initialData.image ? (
-                    <div className="text-center space-y-5">
-                       <div className="w-20 h-20 bg-white/5 rounded-[32px] border border-white/10 flex items-center justify-center mx-auto group-hover:bg-blue-600/10 group-hover:border-blue-500/50 transition-premium">
-                          <Upload className="w-8 h-8 text-slate-600 group-hover:text-blue-400" />
-                       </div>
-                       <span className="text-[11px] font-black uppercase tracking-[0.8em] text-slate-600">Visual Prior</span>
-                    </div>
-                  ) : (
-                    <div className="relative w-full h-full p-2">
-                      <div className="w-full h-36 rounded-[40px] overflow-hidden border border-blue-500/30 shadow-2xl">
-                        <img src={initialData.image} alt="Asset" className="w-full h-full object-cover grayscale opacity-40 group-hover:grayscale-0 group-hover:opacity-100 transition-premium" />
-                      </div>
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-premium bg-black/70 rounded-[40px]">
-                        <span className="text-[11px] font-black text-white uppercase tracking-widest">Update Asset</span>
-                      </div>
-                    </div>
-                  )}
-                  <input ref={fileInputRef} type="file" accept="image/*" onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onloadend = () => onChange({...initialData, image: reader.result as string});
-                      reader.readAsDataURL(file);
-                    }
-                  }} className="hidden" />
-                </div>
-               )
-             }
-             return (
-              <div key={idx} className={`glass rounded-[56px] p-12 border border-white/10 transition-premium hover:border-${field.color}-500/40 shadow-2xl group hover:shadow-[0_40px_80px_rgba(0,0,0,0.4)]`}>
-                <div className="flex items-center gap-5 mb-8">
-                  <div className={`p-4 rounded-2xl bg-${field.color}-500/10 text-${field.color}-500 group-hover:scale-110 group-hover:rotate-3 transition-premium shadow-lg`}>
-                    <field.icon className="w-6 h-6" />
-                  </div>
-                  <span className="text-[12px] font-black uppercase tracking-[0.6em] text-slate-500">{(field as any).label}</span>
-                </div>
-                <textarea 
-                  value={(initialData as any)[field.id]}
-                  onChange={(e) => onChange({...initialData, [field.id]: e.target.value})}
-                  placeholder={(field as any).placeholder}
-                  className="w-full bg-transparent border-none focus:outline-none text-lg text-slate-300 placeholder:text-slate-800 resize-none h-28 font-bold leading-relaxed selection:bg-blue-500/40"
-                />
-              </div>
-             )
-           })}
         </div>
       </form>
     </div>
