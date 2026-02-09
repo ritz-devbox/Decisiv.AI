@@ -14,7 +14,7 @@ import HistoryHub from './components/HistoryHub';
 import LiveCore from './components/LiveCore';
 import SampleSelector, { SAMPLES } from './components/SampleSelector';
 import { getDecision } from './services/geminiService';
-import { ShieldCheck, Sparkles, Brain, Cpu, Zap, LayoutGrid, Clock, Radio, AlertTriangle, RefreshCw, Activity, Key, ChevronRight, ExternalLink } from 'lucide-react';
+import { ShieldCheck, Sparkles, Brain, Cpu, Zap, LayoutGrid, Clock, Radio, AlertTriangle, RefreshCw, Activity, Key, ChevronRight, ExternalLink, Heart, Github, Linkedin, Twitter, X, User } from 'lucide-react';
 
 const App: React.FC = () => {
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -24,6 +24,7 @@ const App: React.FC = () => {
   const [progress, setProgress] = useState(0);
   const [thinkingLog, setThinkingLog] = useState('INITIALIZING_CORE');
   const [errorType, setErrorType] = useState<'GENERIC' | 'QUOTA' | 'AUTH'>('GENERIC');
+  const [isDevProfileOpen, setIsDevProfileOpen] = useState(false);
   
   const [formData, setFormData] = useState<DecisionInput>({
     title: '',
@@ -69,7 +70,7 @@ const App: React.FC = () => {
     if (window.aistudio) {
       await window.aistudio.openSelectKey();
     }
-    // Proceed immediately to the app to prevent recording delays
+    // Race condition mitigation: Proceed immediately after trigger
     setIsAuthorized(true);
   };
 
@@ -135,9 +136,9 @@ const App: React.FC = () => {
       const errStr = JSON.stringify(error).toLowerCase();
       if (errStr.includes('quota') || errStr.includes('429')) {
         setErrorType('QUOTA');
-      } else if (errStr.includes('key') || errStr.includes('auth') || errStr.includes('unauthorized')) {
+      } else if (errStr.includes('key') || errStr.includes('auth') || errStr.includes('unauthorized') || errStr.includes('entity was not found')) {
         setErrorType('AUTH');
-        setIsAuthorized(false);
+        setIsAuthorized(false); 
       } else {
         setErrorType('GENERIC');
       }
@@ -174,9 +175,9 @@ const App: React.FC = () => {
 
            <div className="glass-dark border border-white/10 rounded-[48px] p-12 space-y-10 shadow-2xl backdrop-blur-3xl">
               <div className="space-y-6">
-                <h2 className="text-2xl font-black uppercase tracking-tight">System Initialization</h2>
+                <h2 className="text-2xl font-black uppercase tracking-tight">System Authorization</h2>
                 <p className="text-slate-400 text-lg font-medium italic leading-relaxed">
-                  Authorize the reasoning core to begin. Note: Video Teasers and high-spectral modules require a paid project key.
+                  To access High-Quality Video Generation (Veo) and Live Interrogation, please select a **paid project API key**.
                 </p>
               </div>
 
@@ -185,7 +186,7 @@ const App: React.FC = () => {
                   onClick={handleInitializeCore}
                   className="group relative w-full py-10 rounded-[32px] bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-[0.5em] text-sm transition-premium flex items-center justify-center gap-4 shadow-[0_20px_60px_rgba(59,130,246,0.4)] active:scale-95 border border-white/10"
                 >
-                  Initialize Strategic Core
+                  Authorize Strategic Core
                   <ChevronRight className="w-6 h-6 group-hover:translate-x-2 transition-transform" />
                 </button>
                 
@@ -196,7 +197,7 @@ const App: React.FC = () => {
                   className="flex items-center justify-center gap-3 text-slate-500 hover:text-white transition-colors text-[10px] font-black uppercase tracking-widest"
                 >
                   <ExternalLink className="w-4 h-4" />
-                  API Billing Documentation
+                  How to Enable Billing for Video
                 </a>
               </div>
            </div>
@@ -206,7 +207,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#020617] text-slate-200 font-sans selection:bg-blue-500/30 overflow-x-hidden print:overflow-visible print:bg-white">
+    <div className="min-h-screen bg-[#020617] text-slate-200 font-sans selection:bg-blue-500/30 overflow-x-hidden print:overflow-visible print:bg-white flex flex-col">
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 no-print">
         <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-blue-600/15 blur-[180px] ambient-light rounded-full" />
         <div className="absolute bottom-[-20%] right-[-10%] w-[70%] h-[70%] bg-emerald-600/10 blur-[220px] ambient-light rounded-full" style={{ animationDelay: '-15s' }} />
@@ -258,7 +259,7 @@ const App: React.FC = () => {
         </div>
       </nav>
 
-      <main className="container mx-auto px-10 pt-56 pb-48 relative z-10 print:pt-0 print:pb-0 print:mt-0 print:overflow-visible">
+      <main className="container mx-auto px-10 pt-56 pb-48 relative z-10 print:pt-0 print:pb-0 print:mt-0 print:overflow-visible flex-1">
         {view === 'HUB' && (
           <div className="space-y-40 animate-in fade-in duration-1000 print:space-y-10 print:animate-none">
             {engineState === EngineState.ERROR && (
@@ -275,7 +276,7 @@ const App: React.FC = () => {
                     {errorType === 'QUOTA' 
                       ? "The AI provider's quota is exhausted. This usually resets within 60 seconds." 
                       : errorType === 'AUTH'
-                      ? "The secure connection to the reasoning core failed. Your key may be invalid or restricted."
+                      ? "The secure connection to the reasoning core failed. Ensure you selected a valid API key."
                       : "The Strategic Resolution Engine encountered an unexpected disruption during synthesis."}
                   </p>
                 </div>
@@ -292,7 +293,7 @@ const App: React.FC = () => {
                     className="px-12 py-5 bg-slate-900 rounded-[32px] border border-white/10 text-slate-400 font-black uppercase tracking-[0.3em] text-[12px] flex items-center justify-center gap-4 transition-premium hover:scale-105 active:scale-95 hover:text-white"
                   >
                     <Key className="w-5 h-5" />
-                    Reset Key Authorization
+                    Switch Key
                   </button>
                 </div>
               </div>
@@ -395,6 +396,107 @@ const App: React.FC = () => {
           </div>
         )}
       </main>
+
+      <footer className="relative z-10 py-16 mt-20 border-t border-white/5 no-print glass-dark backdrop-blur-3xl">
+        <div className="container mx-auto px-10 flex flex-col items-center gap-8">
+           <div className="flex items-center gap-4">
+              <div className="w-12 h-px bg-gradient-to-r from-transparent to-slate-800" />
+              <ShieldCheck className="w-5 h-5 text-blue-600/40" />
+              <div className="w-12 h-px bg-gradient-to-l from-transparent to-slate-800" />
+           </div>
+           
+           <div className="flex flex-col items-center gap-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.6em] text-slate-500 flex items-center gap-3">
+                 © 2025 Decisiv.AI 
+                 <span className="w-1 h-1 bg-blue-600 rounded-full animate-pulse" />
+                 Strategic Resolution Hub
+              </p>
+              <div className="flex items-center gap-3 text-slate-600 text-[9px] font-black uppercase tracking-[0.4em]">
+                 Developed by 
+                 <button 
+                  onClick={() => setIsDevProfileOpen(true)}
+                  className="text-slate-200 hover:text-blue-500 transition-premium cursor-pointer border-b border-white/10 hover:border-blue-500/40 pb-0.5"
+                 >
+                   Ritish
+                 </button>
+              </div>
+           </div>
+
+           <div className="flex items-center gap-6 opacity-30 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-700">
+              <Heart className="w-3 h-3 text-red-500 animate-pulse" />
+           </div>
+        </div>
+      </footer>
+
+      {/* Developer Spotlight Card */}
+      {isDevProfileOpen && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 animate-in fade-in duration-500 no-print">
+           <div 
+            className="absolute inset-0 bg-black/80 backdrop-blur-md" 
+            onClick={() => setIsDevProfileOpen(false)}
+           />
+           <div className="relative glass-dark border border-white/20 rounded-[48px] p-12 w-full max-w-xl shadow-[0_50px_150px_rgba(0,0,0,0.9)] animate-in zoom-in-95 duration-500 overflow-hidden premium-border">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 blur-[100px] rounded-full -translate-y-1/2 translate-x-1/2" />
+              
+              <button 
+                onClick={() => setIsDevProfileOpen(false)}
+                className="absolute top-8 right-8 p-3 rounded-full bg-white/5 border border-white/10 text-slate-500 hover:text-white hover:bg-white/10 transition-premium"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex flex-col items-center text-center space-y-10 relative z-10">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-blue-500/20 blur-2xl rounded-full" />
+                  <div className="relative w-32 h-32 rounded-[40px] bg-blue-600 flex items-center justify-center border border-white/10 shadow-2xl">
+                    <User className="w-16 h-16 text-white" />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                   <h3 className="text-4xl font-black text-white uppercase tracking-tighter leading-none">Ritish Nedunoori</h3>
+                   <div className="flex flex-col items-center gap-2">
+                     <span className="text-[11px] font-black uppercase tracking-[0.5em] text-blue-500">Full Stack Developer</span>
+                     <p className="text-slate-400 font-medium italic max-w-sm leading-relaxed">
+                        Design and orchestration of high-precision logical co-pilots and neural synthesis systems.
+                     </p>
+                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 w-full">
+                  {[
+                    { label: 'Neural Protocols', value: 'Gemini 3 Pro // Flash' },
+                    { label: 'Logic Kernel', value: 'TypeScript // React 19' },
+                    { label: 'UI Signature', value: 'Custom Glassmorphism' }
+                  ].map(stat => (
+                    <div key={stat.label} className="flex items-center justify-between p-6 rounded-3xl bg-white/5 border border-white/5 shadow-inner">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">{stat.label}</span>
+                      <span className="text-[11px] font-black text-slate-200 uppercase tracking-tight">{stat.value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-6 pt-6 border-t border-white/5 w-full justify-center">
+                  {[
+                    { icon: Github, href: 'https://github.com/ritz-devbox' },
+                    { icon: Linkedin, href: 'https://linkedin.com/in/ritish-nedunoori' },
+                    { icon: Twitter, href: 'https://twitter.com/nedunooriritish' } // Updated to Twitter (X)
+                  ].map((social, i) => (
+                    <a 
+                      key={i}
+                      href={social.href} 
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-blue-500 hover:border-blue-500/40 hover:bg-blue-600/10 transition-premium"
+                    >
+                      <social.icon className="w-6 h-6" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 };
